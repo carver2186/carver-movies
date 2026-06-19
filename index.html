@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carver's Movies</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0f1115">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1f232c; --border:#2a2f3a;
+    --text:#e8eaed; --muted:#9aa3b2; --accent:#e0a93a; --accent2:#5b8def;
+    --good:#3fbf6f; --bad:#e0563a; --queue:#9b6bdb;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  body{padding-bottom:40px;}
+  a{color:var(--accent2);text-decoration:none;}
+
+  /* sticky status/header bar — always visible per Carver's feedback */
+  #topbar{position:sticky;top:0;z-index:50;background:var(--panel);
+    border-bottom:1px solid var(--border);padding:10px 14px;}
+  #topbar .row1{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  #topbar h1{font-size:17px;margin:0;font-weight:700;}
+  #gearBtn{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:4px 8px;}
+  #syncLine{margin-top:6px;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:8px;}
+  #syncDot{width:8px;height:8px;border-radius:50%;background:var(--good);flex-shrink:0;}
+  #syncDot.busy{background:var(--accent);}
+  #syncDot.error{background:var(--bad);}
+  #retryBtn{display:none;background:var(--bad);color:#fff;border:none;border-radius:6px;
+    padding:3px 9px;font-size:12px;cursor:pointer;}
+
+  #tabs{display:flex;gap:6px;padding:10px 14px 0;}
+  .tab{flex:1;text-align:center;padding:9px 4px;border-radius:8px;background:var(--panel2);
+    color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;border:1px solid var(--border);}
+  .tab.active{background:var(--accent);color:#1a1300;border-color:var(--accent);}
+
+  #controls{display:flex;gap:8px;padding:10px 14px;flex-wrap:wrap;}
+  #controls input[type=text]{flex:1;min-width:120px;background:var(--panel2);border:1px solid var(--border);
+    color:var(--text);padding:8px 10px;border-radius:8px;font-size:14px;}
+  #controls select{background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:8px 8px;border-radius:8px;font-size:13px;}
+
+  #list{padding:0 14px;display:flex;flex-direction:column;gap:10px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+  .card .titleRow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .card h3{margin:0;font-size:15.5px;line-height:1.3;}
+  .card .meta{color:var(--muted);font-size:12px;margin-top:2px;}
+  .card .desc{font-size:13.5px;color:#c7cad1;margin:8px 0;line-height:1.4;}
+  .card .links{font-size:12.5px;margin-bottom:8px;}
+  .fitBadge{font-size:12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;
+    padding:3px 7px;white-space:nowrap;color:var(--accent);font-weight:600;}
+  .ratingBadge{font-size:12px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;
+    padding:3px 7px;white-space:nowrap;color:var(--good);font-weight:600;}
+  .actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;}
+  .rateBtn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border);background:var(--panel2);
+    color:var(--text);font-size:13px;font-weight:700;cursor:pointer;}
+  .rateBtn.set{background:var(--good);color:#06210f;border-color:var(--good);}
+  .pillBtn{border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:7px;
+    padding:6px 10px;font-size:12.5px;cursor:pointer;}
+  .pillBtn.queue{color:var(--queue);border-color:var(--queue);}
+  .pillBtn.unqueue{color:var(--bad);border-color:var(--bad);}
+  .pillBtn.undo{color:var(--muted);}
+  .reorderBtn{border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:7px;
+    width:30px;height:30px;font-size:14px;cursor:pointer;}
+  .qNum{font-size:12px;color:var(--muted);min-width:20px;text-align:center;}
+  #empty{text-align:center;color:var(--muted);padding:40px 20px;font-size:14px;}
+
+  /* settings modal */
+  #settingsOverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;
+    align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;}
+  #settingsOverlay.open{display:flex;}
+  #settingsBox{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;
+    max-width:420px;width:100%;margin-top:30px;}
+  #settingsBox h2{margin-top:0;font-size:17px;}
+  #settingsBox label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 4px;}
+  #settingsBox input{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:9px 10px;border-radius:8px;font-size:14px;}
+  #settingsBox .help{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.4;}
+  #settingsBox .btnRow{display:flex;gap:8px;margin-top:18px;}
+  #settingsBox button{flex:1;padding:10px;border-radius:8px;border:none;font-size:14px;font-weight:600;cursor:pointer;}
+  #saveSettingsBtn{background:var(--accent);color:#1a1300;}
+  #closeSettingsBtn{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  #settingsStatus{font-size:12.5px;margin-top:10px;min-height:16px;}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="row1">
+    <h1>🎬 Carver's Movies</h1>
+    <button id="gearBtn" title="Settings">⚙</button>
+  </div>
+  <div id="syncLine">
+    <span id="syncDot"></span>
+    <span id="syncText">Loading…</span>
+    <button id="retryBtn">Retry</button>
+  </div>
+</div>
+
+<div id="tabs">
+  <div class="tab active" data-tab="To watch">Queue <span id="cnt-queue"></span></div>
+  <div class="tab" data-tab="Unseen">Unseen <span id="cnt-unseen"></span></div>
+  <div class="tab" data-tab="Seen">Seen <span id="cnt-seen"></span></div>
+</div>
+
+<div id="controls">
+  <input type="text" id="searchBox" placeholder="Search title…">
+  <select id="typeFilter"><option value="">All types</option></select>
+  <select id="sortSel"></select>
+</div>
+
+<div id="list"></div>
+<div id="empty" style="display:none;">Nothing here.</div>
+
+<!-- Settings -->
+<div id="settingsOverlay">
+  <div id="settingsBox">
+    <h2>Settings</h2>
+    <p class="help">This app reads and writes directly to your GitHub repo. Enter these once per device — they're saved only in this browser.</p>
+    <label>GitHub username</label>
+    <input type="text" id="ownerInput" placeholder="e.g. carver2186" autocapitalize="off" autocorrect="off">
+    <label>Repo name</label>
+    <input type="text" id="repoInput" placeholder="e.g. carver-movies" autocapitalize="off" autocorrect="off">
+    <label>Personal access token (fine-grained, Contents: Read & write)</label>
+    <input type="password" id="tokenInput" placeholder="github_pat_…" autocapitalize="off" autocorrect="off">
+    <p class="help">Don't have a token yet? See SETUP.md in the repo for step-by-step instructions on creating one scoped to just this repo.</p>
+    <div class="btnRow">
+      <button id="closeSettingsBtn">Cancel</button>
+      <button id="saveSettingsBtn">Save &amp; reload</button>
+    </div>
+    <div id="settingsStatus"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ── Settings / config ────────────────────────────────────────────────
+  const LS_KEY = 'cmt_settings_v1';
+  function getSettings(){
+    try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }catch(e){ return {}; }
+  }
+  function setSettings(s){ localStorage.setItem(LS_KEY, JSON.stringify(s)); }
+  let settings = getSettings();
+
+  const DATA_PATH = 'data.json';
+  let sha = null;
+  let rows = [];
+  let activeTab = 'To watch';
+  let searchTerm = '';
+  let typeFilterVal = '';
+  let sortVal = '';
+
+  // ── DOM refs ──────────────────────────────────────────────────────────
+  const syncDot = document.getElementById('syncDot');
+  const syncText = document.getElementById('syncText');
+  const retryBtn = document.getElementById('retryBtn');
+  const listEl = document.getElementById('list');
+  const emptyEl = document.getElementById('empty');
+  const searchBox = document.getElementById('searchBox');
+  const typeFilter = document.getElementById('typeFilter');
+  const sortSel = document.getElementById('sortSel');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+  const gearBtn = document.getElementById('gearBtn');
+  const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  const settingsStatus = document.getElementById('settingsStatus');
+  const ownerInput = document.getElementById('ownerInput');
+  const repoInput = document.getElementById('repoInput');
+  const tokenInput = document.getElementById('tokenInput');
+
+  function setSync(state, msg){
+    syncDot.className = state; // '', 'busy', 'error'
+    syncText.textContent = msg;
+    retryBtn.style.display = state === 'error' ? 'inline-block' : 'none';
+  }
+
+  function openSettings(){
+    ownerInput.value = settings.owner || '';
+    repoInput.value = settings.repo || '';
+    tokenInput.value = settings.token || '';
+    settingsStatus.textContent = '';
+    settingsOverlay.classList.add('open');
+  }
+  function closeSettings(){ settingsOverlay.classList.remove('open'); }
+  gearBtn.addEventListener('click', openSettings);
+  closeSettingsBtn.addEventListener('click', closeSettings);
+  saveSettingsBtn.addEventListener('click', function(){
+    const owner = ownerInput.value.trim();
+    const repo = repoInput.value.trim();
+    const token = tokenInput.value.trim();
+    if(!owner || !repo){
+      settingsStatus.textContent = 'Username and repo are required.';
+      settingsStatus.style.color = 'var(--bad)';
+      return;
+    }
+    setSettings({owner, repo, token});
+    settings = {owner, repo, token};
+    closeSettings();
+    init();
+  });
+
+  function configured(){ return !!(settings.owner && settings.repo); }
+
+  // ── Base64 helpers (UTF-8 safe) ─────────────────────────────────────────
+  function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
+  function b64decode(str){ return decodeURIComponent(escape(atob(str.replace(/\n/g,'')))); }
+
+  // ── GitHub Contents API ──────────────────────────────────────────────
+  function apiUrl(){
+    return `https://api.github.com/repos/${settings.owner}/${settings.repo}/contents/${DATA_PATH}`;
+  }
+  function authHeaders(extra){
+    const h = Object.assign({}, extra || {});
+    if(settings.token) h['Authorization'] = 'token ' + settings.token;
+    h['Accept'] = 'application/vnd.github+json';
+    return h;
+  }
+
+  async function loadData(){
+    setSync('busy', 'Loading…');
+    try{
+      const res = await fetch(apiUrl() + '?t=' + Date.now(), {headers: authHeaders()});
+      if(!res.ok){
+        if(res.status === 404){
+          throw new Error('data.json not found in repo — check repo name in Settings.');
+        }
+        throw new Error('GitHub returned ' + res.status);
+      }
+      const json = await res.json();
+      sha = json.sha;
+      rows = JSON.parse(b64decode(json.content));
+      setSync('', 'Synced just now');
+      render();
+    }catch(err){
+      setSync('error', 'Could not load: ' + err.message);
+    }
+  }
+
+  let isSaving = false;
+  let pendingSave = false;
+
+  function queueSave(){
+    if(isSaving){ pendingSave = true; return; }
+    doSave();
+  }
+
+  async function doSave(){
+    isSaving = true;
+    setSync('busy', 'Saving…');
+    try{
+      const body = {
+        message: 'Update from phone/app — ' + new Date().toISOString(),
+        content: b64encode(JSON.stringify(rows, null, 2)),
+        sha: sha
+      };
+      const res = await fetch(apiUrl(), {
+        method: 'PUT',
+        headers: authHeaders({'Content-Type':'application/json'}),
+        body: JSON.stringify(body)
+      });
+      if(!res.ok){
+        const t = await res.text();
+        throw new Error('GitHub returned ' + res.status + ' — ' + t.slice(0,120));
+      }
+      const json = await res.json();
+      sha = json.content.sha;
+      isSaving = false;
+      if(pendingSave){
+        pendingSave = false;
+        doSave();
+      }else{
+        setSync('', 'Synced just now');
+      }
+    }catch(err){
+      isSaving = false;
+      setSync('error', 'Save failed: ' + err.message);
+    }
+  }
+
+  retryBtn.addEventListener('click', function(){
+    if(!sha){ loadData(); } else { queueSave(); }
+  });
+
+  // ── Mutations ─────────────────────────────────────────────────────────
+  const todayISO = () => new Date().toISOString().slice(0,10);
+
+  function rate(row, n){
+    row.MyRating = n;
+    row.PredictedFit = null;
+    row.Status = 'Seen';
+    row.QueueOrder = null;
+    row.DateRated = todayISO();
+    render();
+    queueSave();
+  }
+
+  function markUnseen(row){
+    row.MyRating = null;
+    row.Status = 'Unseen';
+    row.QueueOrder = null;
+    row.DateRated = '';
+    render();
+    queueSave();
+  }
+
+  function queueNext(row){
+    const maxQ = rows.filter(r=>r.Status==='To watch')
+      .reduce((m,r)=> Math.max(m, r.QueueOrder||0), 0);
+    row.Status = 'To watch';
+    row.QueueOrder = maxQ + 1;
+    render();
+    queueSave();
+  }
+
+  function unqueue(row){
+    row.Status = 'Unseen';
+    row.QueueOrder = null;
+    renumberQueue();
+    render();
+    queueSave();
+  }
+
+  function renumberQueue(){
+    const q = rows.filter(r=>r.Status==='To watch')
+      .sort((a,b)=> (a.QueueOrder||999)-(b.QueueOrder||999));
+    q.forEach((r,i)=>{ r.QueueOrder = i+1; });
+  }
+
+  function moveQueue(row, dir){
+    const q = rows.filter(r=>r.Status==='To watch')
+      .sort((a,b)=> (a.QueueOrder||999)-(b.QueueOrder||999));
+    const idx = q.indexOf(row);
+    const swapIdx = idx + dir;
+    if(swapIdx < 0 || swapIdx >= q.length) return;
+    const tmp = q[idx].QueueOrder;
+    q[idx].QueueOrder = q[swapIdx].QueueOrder;
+    q[swapIdx].QueueOrder = tmp;
+    render();
+    queueSave();
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────
+  function populateTypeFilter(){
+    const types = Array.from(new Set(rows.map(r=>r.Type))).sort();
+    typeFilter.innerHTML = '<option value="">All types</option>' +
+      types.map(t=>`<option value="${t}">${t}</option>`).join('');
+  }
+
+  function updateSortOptions(){
+    let opts;
+    if(activeTab === 'Seen'){
+      opts = [
+        ['rating_desc','Rating (high→low)'],
+        ['date_desc','Date rated (newest)'],
+        ['title','Title A–Z'],
+        ['year_desc','Year (newest)']
+      ];
+    }else if(activeTab === 'To watch'){
+      opts = [
+        ['queue','Queue order'],
+        ['fit_desc','Predicted fit (high→low)'],
+        ['title','Title A–Z']
+      ];
+    }else{
+      opts = [
+        ['fit_desc','Predicted fit (high→low)'],
+        ['title','Title A–Z'],
+        ['year_desc','Year (newest)']
+      ];
+    }
+    sortSel.innerHTML = opts.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('');
+    if(opts.some(o=>o[0]===sortVal)) sortSel.value = sortVal;
+    else { sortVal = opts[0][0]; sortSel.value = sortVal; }
+  }
+
+  function applySort(list){
+    const s = [...list];
+    switch(sortVal){
+      case 'rating_desc': s.sort((a,b)=> (b.MyRating||0)-(a.MyRating||0)); break;
+      case 'date_desc': s.sort((a,b)=> (b.DateRated||'').localeCompare(a.DateRated||'')); break;
+      case 'title': s.sort((a,b)=> a.Title.localeCompare(b.Title)); break;
+      case 'year_desc': s.sort((a,b)=> (b.Year||0)-(a.Year||0)); break;
+      case 'fit_desc': s.sort((a,b)=> (b.PredictedFit||0)-(a.PredictedFit||0)); break;
+      case 'queue': s.sort((a,b)=> (a.QueueOrder||999)-(b.QueueOrder||999)); break;
+    }
+    return s;
+  }
+
+  function cardHTML(row){
+    const stars = [1,2,3,4,5].map(n=>
+      `<button class="rateBtn ${row.MyRating===n?'set':''}" data-action="rate" data-n="${n}">${n}</button>`
+    ).join('');
+
+    let badge = '';
+    if(row.Status === 'Seen' && row.MyRating != null){
+      badge = `<span class="ratingBadge">★ ${row.MyRating}/5</span>`;
+    }else if(row.PredictedFit != null){
+      badge = `<span class="fitBadge">fit ${row.PredictedFit.toFixed ? row.PredictedFit.toFixed(1) : row.PredictedFit}</span>`;
+    }
+
+    let queueControls = '';
+    if(row.Status === 'To watch'){
+      queueControls = `
+        <button class="reorderBtn" data-action="up">▲</button>
+        <span class="qNum">#${row.QueueOrder||''}</span>
+        <button class="reorderBtn" data-action="down">▼</button>
+        <button class="pillBtn unqueue" data-action="unqueue">Un-queue</button>`;
+    }else if(row.Status === 'Unseen'){
+      queueControls = `<button class="pillBtn queue" data-action="queue">Queue next</button>`;
+    }else if(row.Status === 'Seen'){
+      queueControls = `<button class="pillBtn undo" data-action="undo">Mark unseen</button>`;
+    }
+
+    return `
+      <div class="card" data-id="${row.__id}">
+        <div class="titleRow">
+          <div>
+            <h3>${row.Title}</h3>
+            <div class="meta">${row.Year} · ${row.Type}${row.Lane ? ' · '+row.Lane : ''}</div>
+          </div>
+          ${badge}
+        </div>
+        <div class="desc">${row.Description || ''}</div>
+        <div class="links">${row.RTLink ? `<a href="${row.RTLink}" target="_blank" rel="noopener">Rotten Tomatoes ↗</a>` : ''}</div>
+        <div class="actions">${stars}${queueControls}</div>
+      </div>`;
+  }
+
+  function render(){
+    document.getElementById('cnt-queue').textContent =
+      '(' + rows.filter(r=>r.Status==='To watch').length + ')';
+    document.getElementById('cnt-unseen').textContent =
+      '(' + rows.filter(r=>r.Status==='Unseen').length + ')';
+    document.getElementById('cnt-seen').textContent =
+      '(' + rows.filter(r=>r.Status==='Seen').length + ')';
+
+    updateSortOptions();
+
+    let list = rows.filter(r=>r.Status === activeTab);
+    if(typeFilterVal) list = list.filter(r=>r.Type === typeFilterVal);
+    if(searchTerm){
+      const t = searchTerm.toLowerCase();
+      list = list.filter(r=> r.Title.toLowerCase().includes(t));
+    }
+    list = applySort(list);
+
+    if(list.length === 0){
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'block';
+    }else{
+      emptyEl.style.display = 'none';
+      listEl.innerHTML = list.map(cardHTML).join('');
+    }
+  }
+
+  // ── Event delegation ──────────────────────────────────────────────────
+  listEl.addEventListener('click', function(e){
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const card = e.target.closest('.card');
+    const id = card.getAttribute('data-id');
+    const row = rows.find(r=>String(r.__id) === id);
+    if(!row) return;
+    const action = btn.getAttribute('data-action');
+    if(action === 'rate') rate(row, parseInt(btn.getAttribute('data-n'),10));
+    else if(action === 'queue') queueNext(row);
+    else if(action === 'unqueue') unqueue(row);
+    else if(action === 'undo') markUnseen(row);
+    else if(action === 'up') moveQueue(row, -1);
+    else if(action === 'down') moveQueue(row, 1);
+  });
+
+  document.querySelectorAll('.tab').forEach(function(tabEl){
+    tabEl.addEventListener('click', function(){
+      document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+      tabEl.classList.add('active');
+      activeTab = tabEl.getAttribute('data-tab');
+      render();
+    });
+  });
+
+  searchBox.addEventListener('input', function(){ searchTerm = searchBox.value; render(); });
+  typeFilter.addEventListener('change', function(){ typeFilterVal = typeFilter.value; render(); });
+  sortSel.addEventListener('change', function(){ sortVal = sortSel.value; render(); });
+
+  // ── Init ──────────────────────────────────────────────────────────────
+  async function init(){
+    if(!configured()){
+      setSync('error', 'Set up your GitHub repo in Settings to begin.');
+      openSettings();
+      return;
+    }
+    await loadData();
+    if(rows.length){
+      rows.forEach((r,i)=>{ r.__id = i; });
+      populateTypeFilter();
+      render();
+    }
+  }
+
+  init();
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('./sw.js').catch(function(){});
+    });
+  }
+})();
+</script>
+</body>
+</html>
