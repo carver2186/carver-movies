@@ -1069,14 +1069,14 @@
     "Year": 2014,
     "Type": "Sci-Fi",
     "Lane": "Cerebral sci-fi",
-    "Status": "Unseen",
+    "Status": "To watch",
     "MyRating": null,
     "PredictedFit": 3,
     "DateRated": "",
     "Notes": "Cold/restrained",
     "Description": "A young programmer invited to a tech CEO's remote estate is tasked with determining whether the reclusive genius's android creation has true consciousness.",
     "RTLink": "https://www.rottentomatoes.com/m/ex_machina",
-    "QueueOrder": null,
+    "QueueOrder": 1,
     "__id": 71
   },
   {
